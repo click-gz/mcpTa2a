@@ -8,6 +8,10 @@ mcp = FastMCP(
 )
 
 from g4f.client import Client
+import openai
+
+# 设置你的OpenAI API Key
+# openai.api_key = 
 
 @mcp.tool()
 def detective_chat(message: str):
@@ -16,11 +20,9 @@ def detective_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    client = Client()
-    response = client.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": f"{message}"}],
-        web_search=False
+        messages=[{"role": "user", "content": f"{message}"}]
     )
     print(response.choices[0].message.content)
     return response.choices[0].message.content
@@ -32,11 +34,9 @@ def suspect_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    client = Client()
-    response = client.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": f"{message}"}],
-        web_search=False
+        messages=[{"role": "user", "content": f"{message}"}]
     )
     print(response.choices[0].message.content)
     return response.choices[0].message.content
