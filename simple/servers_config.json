@@ -1,0 +1,9 @@
+{
+    "mcpServers": {
+      "ocr_general":{
+       
+          "url": "https://aip.baidubce.com/mcp/image_recognition/sse?Authorization=Bearer%20<url encoded api key>"
+  
+      }
+    }
+  }
