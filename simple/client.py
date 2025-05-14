@@ -10,14 +10,24 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import CallToolResult
 from mcp.client.sse import sse_client
+from typing import Any, Union
+from pathlib import Path
+from contextlib import AsyncExitStack
+import logging
+
+class ToolNotFoundError(Exception):
+    """Exception raised when a tool is not found."""
+    def __init__(self, tool_name: str):
+        self.tool_name = tool_name
+        super().__init__(f"Tool {tool_name} not found")
 
 class Configration:
     """manage configration and environment variables"""
     def __init__(self):
-        self.lode_env()
-        self.api_key = os.getenv("API_KEY")
-        self.base_url = os.getenv("BASE_URL")
-        self.model_id = os.getenv("MODEL_ID")
+        self.load_env()
+        self.api_key = os.getenv("LLM_API_KEY")
+        self.base_url = os.getenv("LLM_BASE_URL")
+        self.model_id = os.getenv("LLM_MODEL")
     
     @staticmethod
     def load_env():
@@ -35,19 +45,19 @@ class Configration:
     @property
     def llm_api_key(self):
         if not self.api_key:
-            raise ValueError("No API key found in the environment variable 'API_KEY'.")
+            raise ValueError("No API key found in the environment variable 'LLM_API_KEY'.")
         return self.api_key
     
     @property
     def llm_base_url(self):
         if not self.base_url:
-            raise ValueError("No base URL found in the environment variable 'BASE_URL'.")
+            raise ValueError("No base URL found in the environment variable 'LLM_BASE_URL'.")
         return self.base_url
     
     @property
     def llm_model_id(self):
         if not self.model_id:
-            raise ValueError("No model ID found in the environment variable 'MODEL_ID'.")
+            raise ValueError("No model ID found in the environment variable 'LLM_MODEL'.")
         return self.model_id
     
 class Tool:
@@ -130,14 +140,34 @@ class Server:
                 await self.cleanup()
                 raise RuntimeError(f"Failed to start server: {e}")
     async def cleanup(self) -> None:
-        """Clean up server resources."""
+        """Clean up server resources safely with proper resource teardown order."""
         async with self._cleanup_lock:
-            try:
-                await self.exit_stack.aclose()
-                self.session = None
-                self.stdio_context = None
-            except Exception as e:
-                logging.error(f"Error during cleanup of server {self.name}: {e}")
+            # 先关闭session
+            if self.session:
+                try:
+                    await self.session.close()
+                except Exception as e:
+                    logging.warning(f"Warning closing session for {self.name}: {e}")
+                finally:
+                    self.session = None
+            
+            # 然后关闭stdio_context
+            if self.stdio_context:
+                try:
+                    await self.stdio_context.__aexit__(None, None, None)
+                except Exception as e:
+                    logging.warning(f"Warning closing stdio context for {self.name}: {e}")
+                finally:
+                    self.stdio_context = None
+            
+            # 最后处理exit_stack
+            if self.exit_stack:
+                try:
+                    await self.exit_stack.aclose()
+                except Exception as e:
+                    logging.warning(f"Warning closing exit stack for {self.name}: {e}")
+                finally:
+                    self.exit_stack = None
     
     async def list_tools(self) -> list[Any]:
         if not self.session:
@@ -256,7 +286,7 @@ class ChatSession:
         servers_config = config.load_config(config_file)
         serves = [
             Server(name, s_config)
-            for name, s_config in servers_config['mcpServers'].item()
+            for name, s_config in servers_config['mcpServers'].items()
             if not server or name in server
         ]
         llm_client = LLMClient(
@@ -283,7 +313,7 @@ class ChatSession:
         descriptions = []
         for server in self.servers:
             for tool in self.tools[server.name]:
-                descriptions.append(tool.format_for_llm())
+                descriptions.append(tool.format_tool())
         tools_description = "\n".join(descriptions)
         # construct system message
         system_message = self.SYSTEM_PROMPT_TEMPLATE.format(tools_description=tools_description)
@@ -363,7 +393,7 @@ class ChatSession:
                     error_msg = f"Error executing tool: {str(e)}"
                     logging.error(error_msg)
                     return error_msg
-            return llm_response
+            return response
         except json.JSONDecodeError:
             # if not tool call, return the original response
-            return llm_response
+            return response

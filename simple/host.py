@@ -1,5 +1,4 @@
 """
-@Time    :   2025/04/11 16:19:29
 @Desc    :   simple demo for mcp
 """
 # -*-coding:utf-8 -*-
@@ -22,7 +21,7 @@ def print_green(text):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="servers_config.yaml", help="config file path")
+    parser.add_argument("--config", type=str, default="servers_config.json", help="config file path")
     parser.add_argument("--servers", nargs="*", help="servers to connect")
     parser.add_argument("-f", "--file", type=str, help="file path")
     return parser.parse_args()
@@ -56,7 +55,6 @@ async def main():
         response = chat_session.llm_client.get_response(chat_session.messages)
         chat_session.messages.append({"role": "assistant", "content": response})
 
-        print_green(f"assistant: {response}")
         result = await chat_session.process_llm_response(response, file_bytes=file_bytes)
         # 返回的是工具调用
         if isinstance(result, CallToolResult):

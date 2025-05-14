@@ -1,9 +1,23 @@
 {
     "mcpServers": {
-      "ocr_general":{
-       
-          "url": "https://aip.baidubce.com/mcp/image_recognition/sse?Authorization=Bearer%20<url encoded api key>"
-  
-      }
+        "ocr_general": {
+            "url": "https://aip.baidubce.com/mcp/image_recognition/sse?Authorization=Bearer%20<url encoded api key>"
+        },
+        "chat_general": {
+            "command": "python",
+            "args": ["chat_server.py"],
+            "env": {
+                "LLM_API_KEY": "",
+                "LLM_BASE_URL": "https://qianfan.baidubce.com/v2",
+                "LLM_MODEL": "ernie-4.0-turbo-128k"
+            }
+        },
+        "file_server": {
+            "command": "python",
+            "args": ["file_server.py"],
+            "env": {
+                "BASE_DATA_DIR": "./"
+            }
+        }
     }
   }

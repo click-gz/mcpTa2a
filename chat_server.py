@@ -11,8 +11,7 @@ from g4f.client import Client
 import openai
 
 # 设置你的OpenAI API Key
-# openai.api_key = 
-
+openai.api_key = ""
 @mcp.tool()
 def detective_chat(message: str):
     """
