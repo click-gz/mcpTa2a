@@ -1,0 +1,11 @@
+Detective: Good evening, Mr. Smith. I understand you were at the scene of the crime last night. Can you tell me what you saw?
+
+Suspect: Yes, Detective. I was there, but I didn't see anything unusual. I left around 10 PM.
+
+Detective: That's interesting, because the security cameras show you leaving at 11 PM. Can you explain the discrepancy?
+
+Suspect: Oh, I must have been mistaken about the time. It was a late night, and I was tired.
+
+Detective: I see. And can anyone confirm your whereabouts after 11 PM?
+
+Suspect: No, Detective. I was alone at home.

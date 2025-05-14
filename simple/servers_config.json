@@ -9,7 +9,7 @@
             "env": {
                 "LLM_API_KEY": "",
                 "LLM_BASE_URL": "https://qianfan.baidubce.com/v2",
-                "LLM_MODEL": "ernie-4.0-turbo-128k"
+                "LLM_MODEL": "deepseek-v3-241226"
             }
         },
         "file_server": {

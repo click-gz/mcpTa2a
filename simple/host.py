@@ -56,24 +56,38 @@ async def main():
         chat_session.messages.append({"role": "assistant", "content": response})
 
         result = await chat_session.process_llm_response(response, file_bytes=file_bytes)
-        # 返回的是工具调用
-        if isinstance(result, CallToolResult):
+        print("result: ", response,result)
+        # 使用循环处理多轮工具调用
+        while isinstance(result, CallToolResult):
+            print("call tool")
+            # 处理工具调用结果
+            tool_results = []
             for item in result.content:
                 if item.type == "image":
-                    # 将item.data base64解码写入一个随机生成的文件名中
                     file_name = f"image_{uuid.uuid4()}.jpg"
                     with open(file_name, "wb") as f:
                         f.write(base64.b64decode(item.data))
                     print_green(f"assistant: image is saved to {file_name}")
+                    tool_results.append(f"图片已保存到 {file_name}")
                 elif item.type == "text":
-                    chat_session.messages.append({"role": "user", "content": "工具执行结果:" + item.text})
-                    # 文本结果经过总结再输出
-                    final_response = chat_session.llm_client.get_response(
-                        chat_session.messages)
-                    print_green(f"assistant: {final_response}")
-        else:
-            # 返回的是最终答案
-            print_green(f"assistant: {response}")
+                    tool_results.append(item.text)
+            
+            # 将工具调用结果添加到对话历史
+            chat_session.messages.append({
+                "role": "user",
+                "content": "tool执行结果:\n" + "\n".join(tool_results)
+            })
+            print("user: " + "工具执行结果:\n" + "\n".join(tool_results))
+            
+            # 获取新的响应
+            response = chat_session.llm_client.get_response(chat_session.messages)
+            chat_session.messages.append({"role": "assistant", "content": response})
+            
+            # 处理新的响应
+            result = await chat_session.process_llm_response(response, file_bytes=file_bytes)
+            print("result: ", result)
+        # 输出最终答案
+        print_green(f"assistant: {response}")
     await chat_session.close_session()
 
 if __name__ == "__main__":

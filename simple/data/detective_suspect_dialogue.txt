@@ -1,0 +1,7 @@
+Detective: Can you tell me where you were last night?
+Suspect: I was at home, watching TV.
+Detective: Is there anyone who can confirm that?
+Suspect: Yes, my neighbor saw me through the window.
+Detective: What were you watching?
+Suspect: A crime drama, ironically.
+Detective: Interesting. We'll check with your neighbor. Thank you for your time.
