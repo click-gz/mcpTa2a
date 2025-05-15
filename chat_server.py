@@ -1,5 +1,3 @@
-
-
 from mcp.server.fastmcp import FastMCP
 
 # mcp server instance
@@ -7,11 +5,10 @@ mcp = FastMCP(
     name="chat"
 )
 
-from g4f.client import Client
-import openai
+# 新版本（>=1.0.0）
+from openai import OpenAI
 
-# 设置你的OpenAI API Key
-openai.api_key = ""
+
 @mcp.tool()
 def detective_chat(message: str):
     """
@@ -19,11 +16,13 @@ def detective_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
+    # 新版本：创建客户端实例
+    client = OpenAI(api_key="", base_url="https://qianfan.baidubce.com/v2")
+    response = client.chat.completions.create(
+        model="ernie-4.5-turbo-32k",  # 使用标准的OpenAI模型名称
         messages=[{"role": "user", "content": f"{message}"}]
     )
-    print(response.choices[0].message.content)
+    # print(response.choices[0].message.content)
     return response.choices[0].message.content
 
 @mcp.tool()
@@ -33,11 +32,12 @@ def suspect_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
+    client = OpenAI(api_key="", base_url="https://qianfan.baidubce.com/v2")
+    response = client.chat.completions.create(
+        model="ernie-4.5-turbo-32k",  # 使用标准的OpenAI模型名称
         messages=[{"role": "user", "content": f"{message}"}]
     )
-    print(response.choices[0].message.content)
+    # print(response.choices[0].message.content)
     return response.choices[0].message.content
 
 if __name__ == "__main__":

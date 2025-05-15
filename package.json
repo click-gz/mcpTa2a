@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@wopal/mcp-server-hotnews": "^0.2.0"
+  }
+}

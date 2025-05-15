@@ -1,16 +1,12 @@
-
-
 from mcp.server.fastmcp import FastMCP
-import os
+
 # mcp server instance
 mcp = FastMCP(
     name="chat"
 )
 
+# 新版本（>=1.0.0）
 from openai import OpenAI
-api_key = os.getenv("LLM_API_KEY")
-base_url = os.getenv("LLM_BASE_URL")
-model_id = os.getenv("LLM_MODEL")
 
 
 @mcp.tool()
@@ -20,24 +16,14 @@ def detective_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-    payload = {
-        "messages": messages,
-        "model": model_id,
-        "temperature": 0.7,
-        "max_tokens": 4096,
-        "top_p": 1,
-        "stream": False,
-        "stop": None,
-    }
-
-    try:
-        response = client.chat.completions.create(**payload)
-        return response.choices[0].message.content
-    except Exception as e:
-        error_message = f"Error getting LLM response: {str(e)}"
-        logging.error(error_message)
-        return error_message
+    # 新版本：创建客户端实例
+    client = OpenAI(api_key="", base_url="https://qianfan.baidubce.com/v2")
+    response = client.chat.completions.create(
+        model="ernie-4.5-turbo-32k",  # 使用标准的OpenAI模型名称
+        messages=[{"role": "user", "content": f"{message}"}]
+    )
+    # print(response.choices[0].message.content)
+    return response.choices[0].message.content
 
 @mcp.tool()
 def suspect_chat(message: str):
@@ -46,24 +32,13 @@ def suspect_chat(message: str):
     Args:
         message (str): 用户的消息。
     """
-    client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-    payload = {
-        "messages": messages,
-        "model": model_id,
-        "temperature": 0.7,
-        "max_tokens": 4096,
-        "top_p": 1,
-        "stream": False,
-        "stop": None,
-    }
-
-    try:
-        response = client.chat.completions.create(**payload)
-        return response.choices[0].message.content
-    except Exception as e:
-        error_message = f"Error getting LLM response: {str(e)}"
-        logging.error(error_message)
-        return error_message
+    client = OpenAI(api_key="", base_url="https://qianfan.baidubce.com/v2")
+    response = client.chat.completions.create(
+        model="ernie-4.5-turbo-32k",  # 使用标准的OpenAI模型名称
+        messages=[{"role": "user", "content": f"{message}"}]
+    )
+    # print(response.choices[0].message.content)
+    return response.choices[0].message.content
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
