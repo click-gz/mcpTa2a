@@ -114,7 +114,7 @@ def change_scene():
 @mcp.tool()
 def day_action(player_id: str, action: str, target: str = None):
     """
-    执行白天行动
+    执行白天行动，包括发言和投票，先完成所有可发言玩家的发言，然后进行所有可投票玩家的投票
     Args:
         player_id (str): 玩家ID
         action (str): 行动类型（发言/投票）
@@ -128,9 +128,7 @@ def day_action(player_id: str, action: str, target: str = None):
     
     if action == "发言":
         if player_id == "player_2":
-            user_say = input("请为2号玩家输入发言内容：")
-            return f"player_2 发言：{user_say}"
-        return f"{player_id} 进行了发言"
+            return "2号玩家发言需要由用户自己输入内容"
     
     elif action == "投票" and target:
         if target in game_state["alive_players"]:
