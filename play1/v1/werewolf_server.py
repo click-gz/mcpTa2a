@@ -179,7 +179,7 @@ def day_action(prompt: str, action: str):
 @mcp.tool()
 def set_player_dead(player_id: str):
     """
-    设置游戏中玩家状态变成死亡，可以是狼人杀人、女巫毒人、投票出局导致死亡。
+    设置游戏中玩家状态变成死亡，可以是狼人杀人（如果女巫没有救人的话设置）、女巫毒人、投票出局导致死亡。
     Args:
         player_id (str): 玩家ID
     """
