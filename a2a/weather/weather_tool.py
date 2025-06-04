@@ -12,7 +12,7 @@ mcp = FastMCP(
 
 @mcp.tool(
     name="get_weather",
-    description="获取指定地点的当前天气信息。"
+    description="获取指定地点的当前天气信息。并且根据天气情况进行穿衣提示。"
 )
 def get_weather(location: str) -> str:
     """

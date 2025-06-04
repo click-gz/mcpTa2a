@@ -7,12 +7,15 @@ import asyncio
 import threading
 import socket
 import time # 确保导入 time 模块
+import requests
+import json
+from openai import OpenAI
 
 def ask(prompt: str, system_prompt: str = None) -> str:
     from openai import OpenAI
     client = OpenAI(
         base_url='https://qianfan.baidubce.com/v2',
-        api_key='bce-v3/ALTAK-MNO7ueFojOinVGULYIgBA/978d318585fad146fc72de6bfe44cac87dd82ff0'
+        api_key=''
     )
     message = [
         {"role": "system", "content": system_prompt} if system_prompt else {},
@@ -29,6 +32,8 @@ def ask(prompt: str, system_prompt: str = None) -> str:
     )
     # print(yiyan_generator.choices[0].message.content)
     return yiyan_generator.choices[0].message.content
+
+
 
 # ask("你好，天气助手！", system_prompt="你是一个智能天气助手，能够提供天气查询和穿衣建议。")
 # exit()
@@ -54,6 +59,10 @@ print(f"天气助手 Agent 将运行在: {SERVER_URL}")
 class WeatherAgent(A2AServer):
     def __init__(self, mcp_url: str = "http://localhost:7001"):
         self.mcp_url = mcp_url
+        self.client = OpenAI(
+            base_url='https://qianfan.baidubce.com/v2',
+            api_key=''
+        )
         print(f"🛠️ MyToolAgent 初始化完成，将连接到 MCP 服务: {self.mcp_url}")
         agent_card = AgentCard(
             name="weather_agent",
@@ -75,7 +84,40 @@ class WeatherAgent(A2AServer):
         )
         super().__init__(agent_card=agent_card)
         self.prompt = "你是一个智能天气助手，能够提供天气查询和穿衣建议。"
-
+        self.system_prompt = (
+            "你是一个任务分析助手。你的任务是分析用户的输入，判断其意图并提取相关参数。"
+            "请根据用户的文本，判断意图是 'query_weather' (查询天气), 'get_dressing_advice' (获取穿衣建议), 或者 'unknown' (未知意图)。"
+            "如果意图是 'query_weather'，请提取 'location' 参数。"
+            "如果意图是 'get_dressing_advice'，请提取 'weather_description' 参数。如果没有直接的天气描述，可以将 'weather_description' 设为 null。"
+            "请以JSON格式返回结果，例如：{\"intent\": \"query_weather\", \"parameters\": {\"location\": \"北京\"}} 或者 "
+            "{\"intent\": \"get_dressing_advice\", \"parameters\": {\"weather_description\": \"晴朗，25度\"}} 或者 "
+            "{\"intent\": \"unknown\", \"parameters\": {}}"
+            "如果用户只是打招呼或者聊天，也视为 'unknown'。确保返回的是合法的JSON，不要在JSON前后添加任何其他字符或markdown标记。"
+        )
+    def _get_ernie_response(self, user_query, system_prompt="你是一个乐于助人的AI助手。"):
+        """调用 Ernie 大模型获取回复"""
+        try:
+            print(f"🧠 正在向 Ernie 发送请求: '{user_query}'")
+            message = [
+                {"role": "system", "content": self.system_prompt} ,
+                {"role": "user", "content": user_query}
+            ]
+            yiyan_generator = self.client.chat.completions.create(
+                model="ernie-4.5-turbo-vl-32k-preview", 
+                messages=message, 
+                temperature=0.8, 
+                top_p=0.8,
+                extra_body={ 
+                    "penalty_score":1
+                }
+            )
+            response_content = yiyan_generator.choices[0].message.content
+            print(f"💡 Ernie 回复: '{response_content}'")
+            return response_content
+        except Exception as e:
+            error_msg = f"调用 Ernie API 失败: {e}"
+            print(f"❌ {error_msg}")
+            return error_msg
     def _call_mcp_tool(self, tool_name, params):
         """一个辅助方法，用于调用 MCP 工具"""
         if not self.mcp_url:
@@ -142,122 +184,57 @@ class WeatherAgent(A2AServer):
         # task.status = TaskStatus(state=TaskState.INPUT_REQUIRED, message={"role": "agent", "content": {"type": "text", "text": "请输入你的问题。"}})
         # return task
         try:
-            # 1. 检查是否为约定的 SKILL 调用格式
-            if text.startswith("SKILL:"):
-                try:
-                    # 解析格式: SKILL:SkillName PARAMS:{"key": "value"}
-                    parts = text.split(" PARAMS:", 1)
-                    skill_name_part = parts[0][len("SKILL:"):]
-                    params_json_str = parts[1] if len(parts) > 1 else "{}"
-                    params = json.loads(params_json_str)
+            if not text.strip():
+                task.artifacts = [{"parts": [{"type": "text", "text": "请输入你的问题。"}]}]
+                task.status = TaskStatus(state=TaskState.INPUT_REQUIRED, message={"role": "agent", "content": {"type": "text", "text": "请输入你的问题。"}})
+                return task
 
-                    if skill_name_part == "get_weather":
-                        location = params.get("location")
-                        if location and isinstance(location, str):
-                            response_text = self._call_mcp_tool("get_weather", {"location": "北京"}) # 测试 MCP 工具调用
-                            task_completed = True
-                        else:
-                            response_text = "错误：调用 get_weather 时缺少 'location' 参数或参数类型不正确。"
-                            task_completed = False # Indicate failure
-                    elif skill_name_part == "get_clothing_advice":
-                        weather_desc = params.get("weather_description")
-                        if weather_desc and isinstance(weather_desc, str):
-                            response_text = self.get_dressing_advice(weather_description=weather_desc)
-                            task_completed = True
-                        else:
-                            response_text = "错误：调用 weather_description 时缺少 'weather_description' 参数或参数类型不正确。"
-                            task_completed = False # Indicate failure
-                    else:
-                        response_text = f"错误：未知的技能名称 '{skill_name_part}'。"
-                        task_completed = False # Indicate failure
-                    
-                    if task_completed:
-                        task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
-                        task.status = TaskStatus(state=TaskState.COMPLETED)
-                    else: # Skill call failed (e.g. wrong params, unknown skill)
-                        task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
-                        task.status = TaskStatus(state=TaskState.FAILED, message={"role": "agent", "content": {"type": "text", "text": response_text}})
-                    return task 
-                except json.JSONDecodeError:
-                    response_text = "错误：解析 SKILL 调用中的 PARAMS 参数失败，非法的JSON格式。"
-                    task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
-                    task.status = TaskStatus(state=TaskState.FAILED)
-                    return task
-                except Exception as e: # Other errors during SKILL processing
-                    response_text = f"错误：处理 SKILL 调用时出错 - {str(e)}"
-                    task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
-                    task.status = TaskStatus(state=TaskState.FAILED)
-                    return task
+            res = self._get_ernie_response(text)
+            print(f"Ernie 回复: {res}")
+            res = res.replace("```json", "").replace("```", "").strip() # 去除可能的markdown代码块标记
+            intent = json.loads(res).get("intent", "unknown")
+            params = json.loads(res).get("parameters", "{}")
+            # exit()
+            task_completed = False
 
-            # 2. 如果不是 SKILL 调用，则进行原来的自然语言关键词匹配
-            text_lower = text.lower() # 转小写进行关键词匹配
-            if "天气" in text_lower:
-                location = None
-                # 尝试从 task.message.parameters 获取 (如果 client 能以某种方式设置它)
-                if task.message and hasattr(task.message, 'parameters') and task.message.parameters:
-                    location = task.message.parameters.get("location")
-                
-                if not location: # 如果 parameters 中没有，尝试简单文本提取
-                    if "北京" in text_lower: location = "北京"
-                    elif "上海" in text_lower: location = "上海"
-                    # 可以添加更多城市，或依赖后续的智能意图识别
-
-                if location:
-                    response_text = self.get_current_weather(location=location)
+            if intent == "query_weather":
+                location = params.get("location")
+                if location and isinstance(location, str): # 增加类型检查
+                    response_text = self._call_mcp_tool("get_weather", params)
                     task_completed = True
                 else:
-                    response_text = "请告诉我你具体想查询哪个城市的天气？例如：‘北京天气怎么样？’"
-            
-            elif "穿衣" in text_lower or "怎么穿" in text_lower or "建议" in text_lower:
-                weather_description = None
-                if task.message and hasattr(task.message, 'parameters') and task.message.parameters:
-                    weather_description = task.message.parameters.get("weather_description")
-                
-                if not weather_description and text_lower: # 尝试从文本中提取天气描述
-                    # 这是一个非常粗略的提取，实际应用需要更复杂的NLP逻辑
-                    # 例如，用户可能说："今天天气晴朗，25度，我应该怎么穿？"
-                    # 我们需要提取 "晴朗，25度" 作为 weather_description
-                    # 这里仅作概念演示，实际提取可能需要更复杂的正则或NLP
-                    if "天气是" in text_lower:
-                         match = re.search(r"天气是([^，。？！]+)", text_lower)
-                         if match: weather_description = match.group(1).strip()
-                    elif "今天" in text_lower and ("度" in text_lower or "晴" in text_lower or "雨" in text_lower): # 简单启发式
-                        # 假设天气描述在“今天”之后，在“怎么穿”等词之前
-                        potential_desc_match = re.search(r"今天([^，。？！]+)(?:，)?(?:我该怎么穿|有啥建议)", text_lower)
-                        if potential_desc_match:
-                             weather_description = potential_desc_match.group(1).strip()
-
-
-                if weather_description:
-                    response_text = self.get_dressing_advice(weather_description=weather_description)
+                    response_text = "你想查询哪个城市的天气呢？（我没能从您的话中找到城市名称）"
+            elif intent == "get_dressing_advice":
+                weather_desc = params.get("weather_description")
+                if weather_desc and isinstance(weather_desc, str): # 增加类型检查
+                    response_text = self.get_dressing_advice(weather_description=weather_desc)
                     task_completed = True
-                else:
-                    response_text = "请先告诉我今天的天气怎么样（例如：'晴朗，25度'），我才能给你穿衣建议。"
-            
-            # 根据处理结果设置 task 状态
+                else: # 未能提取到天气描述
+                    response_text = "请先告诉我今天的天气怎么样（比如'晴天25度'），或者先问我天气，我才能给你穿衣建议。"
+            elif intent == "unknown":
+                original_user_text = params.get("original_text", text)
+                response_text = ask(original_user_text, system_prompt="你是一个通用的AI助手，请尽力回答用户的问题或进行聊天。")
+                task_completed = True
+            else: 
+                response_text = f"我暂时还不支持处理 '{intent}' 这种类型的请求。"
+                task_completed = True # 认为已经响应了，即使是说不支持
+
             if task_completed:
                 task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
                 task.status = TaskStatus(state=TaskState.COMPLETED)
-            else: # 没有匹配到任何意图，或者意图匹配但缺少信息
-                # 如果用户有输入文本但未被处理，可以考虑让 Ernie 通用回答
-                if text: 
-                     current_response_text = ask_ernie(text, system_prompt="你是一个通用的AI助手。")
-                     task.artifacts = [{"parts": [{"type": "text", "text": current_response_text}]}]
-                     task.status = TaskStatus(state=TaskState.COMPLETED) # 算是处理了
-                else: # 没有文本输入
-                    task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}] # 使用默认的抱歉消息
-                    task.status = TaskStatus(state=TaskState.INPUT_REQUIRED, message={"role": "agent", "content": {"type": "text", "text": response_text}})
+            else: # 如果 task_completed 为 False，通常意味着需要更多输入
+                task.artifacts = [{"parts": [{"type": "text", "text": response_text}]}]
+                task.status = TaskStatus(state=TaskState.INPUT_REQUIRED, message={"role": "agent", "content": {"type": "text", "text": response_text}})
         
         except Exception as e:
-            print(f"处理任务时发生未捕获的错误: {e}")
+            print(f"处理任务时发生严重错误: {e}")
             import traceback
-            traceback.print_exc()
-            error_message = f"抱歉，处理你的请求时遇到了一个意外的内部错误: {str(e)}"
+            traceback.print_exc() # 打印详细的错误堆栈
+            error_message = "抱歉，我在处理你的请求时遇到了一个内部错误。"
             task.artifacts = [{"parts": [{"type": "text", "text": error_message}]}]
             task.status = TaskStatus(state=TaskState.FAILED)
             
         return task
-
 
 # # 创建 Agent 实例
 # weather_agent_instance = WeatherAgent()
