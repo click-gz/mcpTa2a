@@ -1,0 +1,32 @@
+# config/article_workflow.yaml
+workflow:
+  name: article_generation
+  parameters:
+    initial_input: "人工智能发展现状"
+    
+tools:
+analyze_topic:
+    class: ArticleTools.AnalyzeTopic
+    params:
+    text: "${initial_input}"
+
+generate_outline:
+    class: ArticleTools.GenerateOutline
+    depends_on: ["analyze_topic"]
+    params:
+    keywords: "${analyze_topic.output.keywords}"
+
+research:
+    class: ArticleTools.Research
+    depends_on: ["analyze_topic"]
+    params:
+    keywords: "${analyze_topic.output.keywords}"
+    max_results: 5
+
+generate_content:
+    class: ArticleTools.GenerateContent
+    depends_on: ["analyze_topic", "generate_outline", "research"]
+    params:
+    topic: "${analyze_topic.output}"
+    outline: "${generate_outline.output}"
+    research: "${research.output}"
